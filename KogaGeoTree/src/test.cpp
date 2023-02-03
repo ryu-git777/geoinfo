@@ -31,6 +31,7 @@ struct GeoNode{
 
 	GeoNode *left,*right;
 
+	//コンストラクタ
 	GeoNode(bgeohash h , vector<geopoint> s){
 		node_is_leaf = true;
 		geohash = h;
@@ -49,6 +50,7 @@ struct GeoNode{
 		//if (h.precision() == limitprecision) {
 		//精度が上限になった場合または、集合が範囲内にない場合、葉ノードを出力
 		if (h.precision() >= limitprecision or s.size() == 0) {
+			node_is_leaf = true;
 			for (const auto &p : s) {
 				pset.insert(p);
 			}
@@ -107,79 +109,126 @@ struct GeoNode{
 		}
 	}
 
-	bool is_leaf() const {
+	bool is_leaf()const{
 		return node_is_leaf;
 	}
 
-	vector<geopoint> search(bgeohash h , vector<geopoint> s , GeoNode* node){
-		geohash = h;
-		//int cnt = 0;
+	vector<geopoint> search(bgeohash h) {
+		GeoNode *node = this;
+		//geohash = h;
+		bgeohash::coordbox box = h.decode();
 		vector<geopoint> a;
 		std::vector<GeoNode*> path;
-		long long int prev = NULL;    //prevの型をどうしたらよいか
-		//cout << h.precision() << endl;
-		//cout << node->geohash.precision() << endl;
-		for (const auto &p : s) {
-			pset.insert(p);
-		}
-		/*for (const auto &gp : node->pset) {
-			cout << gp << ",";
-			if (++cnt > 50) {
-				cout << "...";
+		GeoNode *prev;
+		uint64_t intval = h.location();
+
+		cout << h.decode() << endl;
+
+		for (unsigned int i = 0; i < h.precision(); ++i) {
+			if (node->is_leaf() == true ) {
 				break;
 			}
-		}*/
-		//cout << endl;
-		uint64_t intval = geohash.location();
-		//cout << node->geohash.decode() << endl;
-		for (unsigned int i = 0; i < geohash.precision(); ++i) {
-			if (((intval >> (63 - i)) & 1) == 1) {
-				node = node->right;
-				//cout << node->geohash.decode() << endl;
-				//cout << node->pset.size() << endl;
-			}else{
-				node = node->left;
-				//cout << node->geohash.decode() << endl;
-				//cout << node->pset.size() << endl;
-				//cout << "left" << endl;
-			}
-
-			//cout << geohash.decode() << endl;
-
-		}
-		path.push_back(node);
-		while (path.empty() == false) {
-			if (path.back() == /*葉*/) {　　//push_back()が葉であるという条件をどのように表すか
-				for (const auto &gp : node->pset) {
-					a.push_back(gp);
-				}
-				prev = path.pop_back(node);
-				continue;
-			} else if (path.back() != /*葉*/) {
-				if (prev == path.back()->left) {
-					prev = path.back();
-					path.push_back(node->right);
-					continue;
+			if (((intval >> (63 - i)) & 1) == 0) {
+				if (node->left == NULL) {
+					break;
 				} else {
-					if (prev == path.back()->right) {
-						prev = path.pop_back(node);
+					node = node->left;
+					cout << node->geohash.decode() << endl;
+				}
+			} else {
+				if (node->right == NULL) {
+					break;
+				} else {
+					node = node->right;
+					cout << node->geohash.decode() << endl;
+				}
+			}
+		}
+
+
+		path.push_back(node);
+		prev = NULL;
+		prev = path.back();
+
+		//cout << box.covers(path.back()->pset) << endl;
+		//cout << prev->geohash.decode() << endl;
+
+		if (h.precision() == node->geohash.precision()) {
+			while (path.empty() == false) {
+				if (path.back()->is_leaf() == true) {
+					for (const auto &gp : path.back()->pset) {
+						a.push_back(gp);
+						cout << "s2.size:";
+						cout << a.size() << endl;
+					}
+					prev = path.back();
+					cout << prev->geohash.decode() << endl;
+					path.pop_back();
+					cout << "戻る3" << endl;
+					continue;
+				} else if (path.back()->is_leaf() == false) {
+					cout << "in_node" << endl;
+					if (prev == path.back()->left) {
+						cout << "a" << endl;
+						if (path.back()->right == NULL) {
+							prev = path.back();
+							cout << prev->geohash.decode() << endl;
+							path.pop_back();
+							cout << "戻る1" << endl;
+						} else {
+							prev = path.back();
+							cout << prev->geohash.decode() << endl;
+							path.push_back(path.back()->right);
+							cout << "right1" << endl;
+						}
+						continue;
+					} else if (prev == path.back()->right) {
+
+						cout << "b" << endl;
+						prev = path.back();
+						cout << prev->geohash.decode() << endl;
+						path.pop_back();
+						cout << "戻る2" << endl;
 						continue;
 					} else {
-						prev = path.back();
-						path.push_back(path.back()->left);
+						cout << "c" << endl;
+						if (path.back()->left == NULL) {
+							prev = path.back();
+							cout << prev->geohash.decode() << endl;
+							path.push_back(path.back()->right);
+							cout << "right2" << endl;
+
+						} else {
+							prev = path.back();
+							cout << prev->geohash.decode() << endl;
+							path.push_back(path.back()->left);
+							cout << "left1" << endl;
+						}
+
 						continue;
 					}
 				}
 			}
 
+		} else if (h.precision() > node->geohash.precision()) {
+			cout << "b" << endl;
+			if (path.back()->is_leaf() == true) {
+				for (const auto &gp : path.back()->pset) {
+					cout << "b1" << endl;
+					cout << gp.lat << endl;
+					if (box.covers(gp.lat, gp.lon) == true) {
+						a.push_back(gp);
+						cout << "s1.size:";
+						cout << a.size() << endl;
+
+					}
+
+				}
+			} else {
+				cout << "b2" << endl;
+			}
 		}
 
-		//cout << intval << endl;
-		/*if(left == NULL && right == NULL){
-			cout << pset << endl;
-		}else if(){
-			cout <<
-		}*/
 		return a;
 	}
 
@@ -198,7 +247,7 @@ struct GeoNode{
 
 		for (const auto & gp : gnode.pset){
 			out << gp << ",";
-			if(++cnt > 10){
+			if(++cnt > 20){
 				out << "...";
 				break;
 			}
@@ -208,6 +257,7 @@ struct GeoNode{
 
 		out << "s.size:";
 		out << gnode.pset.size() << endl;
+		out << gnode.is_leaf() << endl;
 
 
 		if (gnode.left != NULL) {
@@ -224,78 +274,29 @@ struct GeoNode{
 		return out;
 	}
 
-
-
-	/*ostream & printOn(ostream &out, int level=0) const{
-		string indent,pindent;
-		int i;
-		indent = "	";
-		level=2;
-		for(i=0; i < level;i++){
-			if(left == NULL){
-				pindent = indent +"a";
-
-			}
-			//pindent = indent + "	" ;
-			break;
-		}
-		//level++;
-		//int a = atoi(indent.c_str());
-
-
-		out << pindent;
-		if(left==NULL){
-			//out << indent;
-			//left->printOn(out,level++);
-		}
-
-		//left->printOn(out,level++);
-		//out << endl;
-		//right->printOn(out,level++);
-
-		return out;
-	}*/
-
-
-	/*vector<string> &preorder(vector<string> &T, int id) const {
-		//char abcd;
-		string a = "abc";
-		//string b = geohash.decode();
-		//string b = pset;
-		//int str = T.push_back(abcd);
-
-		//string str = to_string(1);
-		T.push_back(geohash.decode().a());
-		//T.push_back("abcd");
-		for (auto x : T) {
-			cout << x << endl;
-		}
-		//string str = to_string(abcd);
-		cout << "preorder=" << endl;
-		//cout << str << endl;
-		//preorder(out,)
-		return T;
-	}*/
-
 };
 
 
 vector<geopoint> read_geopoints(const string & filename);
 vector<string> split(string& input, char delimiter);
-//void search(bgeohash h , GeoNode* node);
 
 int main(int argc, char *argv[]){
 
 	cout << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
 
-		//double lat = 33.59494018554690, lon = 130.4036063702130;
-		double lat = 33.6155019, lon = 130.6712318;
+		//double lat = 33.59494018554690, lon = 130.4036063702130;//pre=56まで
+		//double lat = 33.594940, lon = 130.40360;//pre=56まで bhash=18
+		//double lat = 33.6155019, lon = 130.6712318;//pre=56まで bhash=56
+	    //double lat = 30.6155019, lon = 80.6155019; //bhash=2
+		double lat = 33.6155, lon = 130.6712; //pre=56まで bhash=40
+		//int pre = 6;
+
 		cout << "encoding cordinate: " << lat << ", " << lon << endl;
 
 		string hashcode = geohash::encode(lat, lon, 7);
 		cout << "geohash code: " << hashcode << endl;
 
-		bgeohash bhash(lat, lon, 30);
+		bgeohash bhash(lat, lon, 41);
 		cout << "bgeohash code: " << bhash << endl;
 		cout << "geohash in binary: " << hex << bhash.location() << endl;
 		uint64_t intval = bhash.location();
@@ -312,21 +313,22 @@ int main(int argc, char *argv[]){
 		exit(EXIT_FAILURE);
 	}
 	vector<geopoint> pset = read_geopoints(argv[1]);
-	//vector<string> T;
-	//ostream& out;
 
-	GeoNode root(bgeohash(0), pset, 10);
+	GeoNode root(bgeohash(0), pset, 40);
 	cout << "p_search = " << endl;
-	for(const auto &gp : root.search(bhash, pset, &root)){
+	int cnt = 0;
+	for(const auto &gp : root.search(bhash)){
 		cout << gp;
+		if(++cnt > 500){
+		cout << "...";
+		break;
+		}
 	}
 	cout << endl;
-	//root.search(bhash, pset, &root);
-	//cout << root.search << endl;
+	cout << endl;
 	cout << "GeoTree = " << endl;
 	cout << root << endl;
 	cout << endl;
-	//root.search(bhash, pset, &root);
 	return 0;
 }
 
